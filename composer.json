@@ -1,0 +1,22 @@
+{
+    "name": "fixxxer/reactphp-promise-await",
+    "description": "ReactPHP Promise-Await Hack",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Konstantin Baryshnikov",
+            "email": "mail@kbaryshnikov.ru"
+        }
+    ],
+    "autoload": {
+        "files": ["lib/Await.php"]
+    },
+    "require": {
+        "react/promise": "^2.7",
+        "react/react": "^0.4.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^7.2"
+    }
+}
