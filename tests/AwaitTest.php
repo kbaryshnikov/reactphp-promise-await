@@ -36,6 +36,32 @@ class AwaitTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals("tick", $result);
     }
 
+    public function testParallelExecution()
+    {
+        $await = new Await($this->loop);
+
+        $promise1 = $this->makeTimeout(0.1, "")->then(
+            function () {
+                return $this->makeTimeout(0.1, "tick1");
+            }
+        );
+
+        $promise2 = $this->makeTimeout(0.1, "tick2");
+
+        $promiseRejects = $this->makeTimeout(0, new \Exception("reject"));
+
+        $result1 = $await->one($promise1);
+        $this->assertEquals("tick1", $result1);
+
+        $result2 = $await->one($promise2);
+        $this->assertEquals("tick2", $result2);
+
+        $this->assertEquals("tick3", $await->one($this->makeTimeout(0.1, "tick3")));
+
+        $this->expectExceptionMessage("reject");
+        $await->one($promiseRejects);
+    }
+
     protected function setUp()
     {
         $this->loop = React\EventLoop\Factory::create();
