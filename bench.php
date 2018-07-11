@@ -1,5 +1,7 @@
 <?php
 
+use ReactPromiseAwait\Await;
+
 require 'vendor/autoload.php';
 
 class Bench

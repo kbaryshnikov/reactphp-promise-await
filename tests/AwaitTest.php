@@ -1,6 +1,7 @@
 <?php
 
 use React\Promise\Promise;
+use ReactPromiseAwait\Await;
 
 class AwaitTest extends \PHPUnit\Framework\TestCase
 {
@@ -36,30 +37,77 @@ class AwaitTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals("tick", $result);
     }
 
+    public function testAwaitAll()
+    {
+        $await = new Await($this->loop);
+        $promises = [];
+        $expected = [];
+        for ($i = 0; $i < 10; $i++) {
+            $promises[] = $this->makeTimeout(random_int(0, 100) / 1000, $i);
+            $expected[] = $i;
+        }
+        $result = $await->all(...$promises);
+        $this->assertEquals($expected, $result);
+    }
+
+    public function testAwaitAllException()
+    {
+        $await = new Await($this->loop);
+        $promises = [$this->makeTimeout(0, new \Exception("reject"))];
+        for ($i = 1; $i < 10; $i++) {
+            $promises[] = $this->makeTimeout(random_int(1, 100) / 1000, $i);
+        }
+        $this->expectExceptionMessage("reject");
+        $await->all(...$promises);
+    }
+
+    public function testAwaitRace()
+    {
+        $await = new Await($this->loop);
+        $promises = [];
+        for ($i = 0; $i < 10; $i++) {
+            $promises[] = $this->makeTimeout($i, $i);
+        }
+        $result = $await->race(...$promises);
+        $this->assertEquals(0, $result);
+    }
+
+    public function testAwaitRaceException()
+    {
+        $await = new Await($this->loop);
+        $promises = [$this->makeTimeout(0, new \Exception("reject"))];
+        for ($i = 1; $i < 10; $i++) {
+            $promises[] = $this->makeTimeout(random_int(1, 100) / 1000, $i);
+        }
+        $this->expectExceptionMessage("reject");
+        $await->all(...$promises);
+    }
+
     public function testParallelExecution()
     {
         $await = new Await($this->loop);
 
-        $promise1 = $this->makeTimeout(0.1, "")->then(
-            function () {
-                return $this->makeTimeout(0.1, "tick1");
-            }
-        );
+        $promise1 = $this->makeTimeout(0, "");
+        $promise2 = $this->makeTimeout(0.1, "");
 
-        $promise2 = $this->makeTimeout(0.1, "tick2");
+        $firstResult = null;
+        $firstTime = null;
+        $promise1->then(function() use ($await, &$firstResult, &$firstTime) {
+            $firstResult = $await->one($this->makeTimeout(0.2, "first"));
+            $firstTime = microtime(true);
+        });
+        $promise2->then(function() use ($await, &$secondResult, &$secondTime) {
+            $secondResult = $await->one($this->makeTimeout(0, "second"));
+            $secondTime = microtime(true);
+        });
 
-        $promiseRejects = $this->makeTimeout(0, new \Exception("reject"));
+        $this->loop->run();
 
-        $result1 = $await->one($promise1);
-        $this->assertEquals("tick1", $result1);
+        $await->one($this->makeTimeout(0.3, ""));
 
-        $result2 = $await->one($promise2);
-        $this->assertEquals("tick2", $result2);
-
-        $this->assertEquals("tick3", $await->one($this->makeTimeout(0.1, "tick3")));
-
-        $this->expectExceptionMessage("reject");
-        $await->one($promiseRejects);
+        $this->assertEquals("first", $firstResult);
+        $this->assertEquals("second", $secondResult);
+        $this->assertGreaterThanOrEqual(0.08, $firstTime - $secondTime);
     }
 
     protected function setUp()
